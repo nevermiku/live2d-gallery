@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<title>角色模型库 · Live2D</title>
+<style>
+:root{--bg:#080d18;--card:#111a2d;--line:#22304d;--acc:#6ff2d0;--acc2:#4aa8ff;--tx:#e9f4f1;--sub:#8899ad;--warn:#ffb86b}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{font:14px/1.6 system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--tx);overflow:hidden;display:flex;flex-direction:column}
+.top{flex:none;display:flex;align-items:center;gap:10px;padding:10px 14px 8px}
+.top h1{font-size:14px;letter-spacing:2px;background:linear-gradient(90deg,var(--acc),var(--acc2));-webkit-background-clip:text;background-clip:text;color:transparent;font-weight:900}
+.top .count{font-size:10px;color:var(--sub);margin-left:auto;letter-spacing:1px}
+#stage{flex:1;position:relative;overflow:hidden;background:radial-gradient(ellipse at 50% 32%,#16233d 0%,#0a1120 62%,#070b14 100%);touch-action:none}
+#stage canvas{display:block}
+.hint{position:absolute;left:50%;top:10px;transform:translateX(-50%);font-size:10.5px;color:#5d7288;letter-spacing:1px;pointer-events:none;white-space:nowrap;background:rgba(8,13,24,.7);padding:4px 12px;border-radius:12px;border:1px solid rgba(34,48,77,.8)}
+.nameTAG{position:absolute;left:14px;bottom:12px;font-size:12px;color:var(--acc);letter-spacing:2px;text-shadow:0 0 12px rgba(111,242,208,.5);pointer-events:none}
+.ld{position:absolute;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;gap:12px;background:rgba(8,13,24,.55);z-index:9;backdrop-filter:blur(2px)}
+.ld.on{display:flex}
+.ring{width:32px;height:32px;border:2px solid rgba(111,242,208,.22);border-top-color:var(--acc);border-radius:50%;animation:sp .75s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.ld span{font-size:11px;color:var(--acc);letter-spacing:2px}
+.err{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:86%;text-align:center;font-size:12px;color:#ff9aa8;line-height:1.9;background:rgba(20,10,16,.85);border:1px solid rgba(255,120,140,.3);border-radius:12px;padding:18px;display:none;z-index:10}
+.panel{flex:none;background:rgba(17,26,45,.96);border-top:1px solid var(--line);padding:8px 0 calc(8px + env(safe-area-inset-bottom))}
+.tabs{display:flex;gap:6px;padding:0 12px 8px;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:none;padding:5px 12px;border-radius:14px;font-size:11.5px;color:var(--sub);border:1px solid var(--line);background:#0c1526;cursor:pointer;white-space:nowrap}
+.tab.on{background:rgba(111,242,208,.14);border-color:var(--acc);color:var(--acc);font-weight:700}
+.grid{display:flex;gap:8px;overflow-x:auto;padding:0 12px 8px;scrollbar-width:none}
+.grid::-webkit-scrollbar{display:none}
+.card{flex:none;width:74px;cursor:pointer;text-align:center}
+.thumb{width:74px;height:74px;border-radius:12px;border:1px solid var(--line);background:linear-gradient(160deg,#182742,#0f1828);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--sub);overflow:hidden;position:relative;transition:.15s}
+.card.on .thumb{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc),0 0 16px rgba(111,242,208,.35)}
+.card.on .thumb::after{content:'';position:absolute;inset:0;background:radial-gradient(circle at 50% 60%,rgba(111,242,208,.18),transparent 70%)}
+.card .nm{font-size:10.5px;color:var(--sub);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card.on .nm{color:var(--acc)}
+.card .sk{font-size:9px;color:#55677d;margin-top:-1px}
+.acts{display:flex;gap:7px;padding:0 12px}
+.btn{flex:1;padding:9px 4px;border:1px solid var(--line);border-radius:9px;background:#0c1526;color:var(--tx);font-size:12px;cursor:pointer;white-space:nowrap}
+.btn:active{transform:scale(.97)}
+.btn.hl{background:linear-gradient(135deg,var(--acc),var(--acc2));color:#04121c;font-weight:900;border:0}
+.note{font-size:9.5px;color:#4a5b70;text-align:center;padding:6px 12px 0;letter-spacing:.5px}
+</style>
+</head>
+<body>
+<div class="top"><h1>角色模型库</h1><span class="count" id="cnt"></span></div>
+
+<div id="stage">
+  <div class="hint">拖拽移动 · 点击互动</div>
+  <div class="nameTAG" id="nameTAG"></div>
+  <div class="ld" id="ld"><div class="ring"></div><span>加载中…</span></div>
+  <div class="err" id="err"></div>
+</div>
+
+<div class="panel">
+  <div class="tabs" id="tabs"></div>
+  <div class="grid" id="grid"></div>
+  <div class="acts">
+    <button class="btn" onclick="randomMotion()">💃 动作</button>
+    <button class="btn" onclick="randomExpr()">😊 表情</button>
+    <button class="btn" onclick="resetView()">🎯 居中</button>
+    <button class="btn hl" onclick="toggleSkin()">👗 换装</button>
+  </div>
+  <div class="note">模型来源：GitHub 开源仓库 · 仅供学习交流，请勿商用</div>
+</div>
+
+<script src="https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js"></script>
+<script src="https://fastly.jsdelivr.net/gh/dylanNew/live2d/webgl/Live2D/lib/live2d.min.js"></script>
+<script src="https://fastly.jsdelivr.net/npm/pixi.js@6.5.10/dist/browser/pixi.min.js"></script>
+<script src="https://fastly.jsdelivr.net/npm/pixi-live2d-display@0.4.0/dist/cubism4.min.js"></script>
+<script src="https://fastly.jsdelivr.net/npm/pixi-live2d-display@0.4.0/dist/cubism2.min.js"></script>
+<script>
+/* =========================================================
+   模型清单
+   group: anime=动漫女主 / game=游戏角色
+   skins: 同一角色的多个皮肤，path 为 model3.json / model.json 完整地址
+   ========================================================= */
+const CDN_E = 'https://fastly.jsdelivr.net/gh/Eikanya/Live2d-model@master/';
+const CDN_I = 'https://fastly.jsdelivr.net/gh/imuncle/live2d@master/';
+const RAW_I = 'https://raw.githubusercontent.com/imuncle/live2d/master/';
+const CDN_A = 'https://fastly.jsdelivr.net/gh/zhangzisu/Live2D-Asuna@master/';
+const CDN_O = 'https://fastly.jsdelivr.net/gh/Liu233jh/oregairu-fuwari@main/';
+
+const MODELS = [
+  // ---------- 动漫女主 ----------
+  { id:'asuna', name:'亚丝娜', src:'刀剑神域', group:'anime',
+    skins:[
+      {label:'立绘04', path:CDN_A+'static/live2d/asuna/asuna_04/asuna_04.model.json'},
+      {label:'立绘12', path:CDN_A+'static/live2d/asuna/asuna_12/asuna_12.model.json'},
+      {label:'立绘18', path:CDN_A+'static/live2d/asuna/asuna_18/asuna_18.model.json'}
+    ]},
+  { id:'yukino', name:'雪之下雪乃', src:'春物', group:'anime',
+    skins:[
+      {label:'校服', path:CDN_O+'public/live2d/models/yukino/yukino_seihuku.model3.json'},
+      {label:'私服', path:CDN_O+'public/live2d/models/yukino/yukino_shihuku.model3.json'}
+    ]},
+  { id:'yui', name:'由比滨结衣', src:'春物', group:'anime',
+    skins:[
+      {label:'校服', path:CDN_O+'public/live2d/models/yui/yui_seihuku.model3.json'},
+      {label:'私服', path:CDN_O+'public/live2d/models/yui/yui_shihuku.model3.json'}
+    ]},
+  { id:'iroha', name:'一色伊吕波', src:'春物', group:'anime',
+    skins:[
+      {label:'校服', path:CDN_O+'public/live2d/models/iroha/iroha_seihuku.model3.json'},
+      {label:'私服', path:CDN_O+'public/live2d/models/iroha/iroha_shihuku.model3.json'}
+    ]},
+  { id:'katou', name:'加藤惠', src:'路人女主', group:'anime',
+    skins:[{label:'制服', path:CDN_I+'model/katou_01/katou_01.model.json'}]},
+  { id:'sagiri', name:'和泉纱雾', src:'埃罗芒阿老师', group:'anime',
+    skins:[{label:'默认', path:CDN_I+'model/sagiri/sagiri.model.json', alt:RAW_I+'model/sagiri/sagiri.model.json'}]},
+  { id:'mashiro', name:'椎名真白', src:'樱花庄', group:'anime',
+    skins:[
+      {label:'校服', path:CDN_I+'model/mashiro/seifuku.model.json'},
+      {label:'私服', path:CDN_I+'model/mashiro/shifuku.model.json'}
+    ]},
+  { id:'kurumi', name:'时崎狂三', src:'约会大作战', group:'anime',
+    skins:[{label:'默认', path:CDN_I+'model/kurumi/model.json'}]},
+  { id:'illya', name:'伊莉雅', src:'Fate', group:'anime',
+    skins:[{label:'默认', path:CDN_I+'model/illyasviel/illyasviel.model.json', alt:RAW_I+'model/illyasviel/illyasviel.model.json'}]},
+  { id:'index', name:'茵蒂克丝', src:'魔禁', group:'anime',
+    skins:[{label:'默认', path:CDN_I+'model/index/model.json'}]},
+  { id:'kanzaki', name:'神裂火织', src:'魔禁', group:'anime',
+    skins:[{label:'默认', path:CDN_I+'model/kanzaki/kanzaki.model.json', alt:RAW_I+'model/kanzaki/kanzaki.model.json'}]},
+  { id:'yukari', name:'紫', src:'东方', group:'anime',
+    skins:[{label:'默认', path:CDN_I+'model/yukari_model/yukari_model.model.json'}]},
+  { id:'miku', name:'初音未来', src:'V家', group:'anime',
+    skins:[{label:'默认', path:CDN_I+'model/miku/miku.model.json'}]},
+
+  // ---------- 游戏角色 ----------
+  { id:'beier', name:'贝尔法斯特', src:'碧蓝航线', group:'game',
+    skins:[{label:'默认', path:CDN_E+encodeURI('碧蓝航线 Azue Lane')+'/Azue%20Lane(JP)/beierfasite_2/beierfasite_2.model3.json'}]},
+  { id:'qiye', name:'企业', src:'碧蓝航线', group:'game',
+    skins:[{label:'默认', path:CDN_E+encodeURI('碧蓝航线 Azue Lane')+'/Azue%20Lane(JP)/qiye_7/qiye_7.model3.json'}]},
+  { id:'chicheng', name:'赤城', src:'碧蓝航线', group:'game',
+    skins:[{label:'默认', path:CDN_E+encodeURI('碧蓝航线 Azue Lane')+'/Azue%20Lane(JP)/chicheng_5/chicheng_5.model3.json'}]},
+  { id:'ougen', name:'欧根亲王', src:'碧蓝航线', group:'game',
+    skins:[{label:'默认', path:CDN_E+encodeURI('碧蓝航线 Azue Lane')+'/Azue%20Lane(JP)/ougen_5/ougen_5.model3.json'}]},
+  { id:'guanghui', name:'光辉', src:'碧蓝航线', group:'game',
+    skins:[{label:'默认', path:CDN_E+encodeURI('碧蓝航线 Azue Lane')+'/Azue%20Lane(JP)/guanghui_7/guanghui_7.model3.json'}]}
+];
+
+/* =========================================================
+   渲染逻辑
+   ========================================================= */
+const stage = document.getElementById('stage');
+const ldEl  = document.getElementById('ld');
+const errEl = document.getElementById('err');
+let app, model = null, curM = -1, curS = 0, dragging = null;
+
+if (!window.PIXI || !PIXI.live2d) {
+  showFatal('渲染库加载失败，请检查网络后刷新');
+} else {
+  boot();
+}
+
+function showFatal(msg){
+  errEl.style.display = 'block';
+  errEl.innerHTML = msg;
+  ldEl.classList.remove('on');
+}
+
+function boot(){
+  // 先建 UI，再尝试建 WebGL 画布（WebGL 失败也不影响列表展示）
+  document.getElementById('cnt').textContent = MODELS.length + ' 位角色';
+  buildTabs();
+  buildGrid('anime');
+
+  try {
+    app = new PIXI.Application({
+      backgroundAlpha: 0,
+      resizeTo: stage,
+      antialias: true,
+      autoDensity: true,
+      resolution: Math.min(window.devicePixelRatio || 1, 2)
+    });
+    stage.appendChild(app.view);
+    app.stage.eventMode = 'static';
+    app.stage.hitArea = app.screen;
+  } catch(e){
+    console.error(e);
+    showFatal('当前浏览器不支持 WebGL，无法显示 Live2D<br><span style="color:#8899ad;font-size:11px">请用较新版本的手机浏览器打开</span>');
+    return;
+  }
+  load(0, 0);
+}
+
+function buildTabs(){
+  const tabs = document.getElementById('tabs');
+  [['anime','动漫女主'],['game','游戏角色']].forEach(([k,label],i)=>{
+    const b = document.createElement('div');
+    b.className = 'tab' + (i===0?' on':'');
+    b.textContent = label + '（' + MODELS.filter(m=>m.group===k).length + '）';
+    b.onclick = ()=>{
+      document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
+      b.classList.add('on');
+      buildGrid(k);
+    };
+    tabs.appendChild(b);
+  });
+}
+
+function buildGrid(group='anime'){
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+  MODELS.forEach((m,idx)=>{
+    if(m.group!==group) return;
+    grid.appendChild(makeCard(m,idx));
+  });
+}
+
+function makeCard(m, idx){
+  const c = document.createElement('div');
+  c.className = 'card' + (idx===curM?' on':'');
+  c.dataset.mid = idx;
+  const skins = m.skins.length;
+  c.innerHTML = `<div class="thumb">${m.name.slice(0,3)}</div>
+    <div class="nm">${m.name}</div>
+    <div class="sk">${m.src}${skins>1?' · '+skins+'套':''}</div>`;
+  c.onclick = ()=>load(idx, 0);
+  return c;
+}
+
+async function load(mi, si){
+  const m = MODELS[mi];
+  if(!m) return;
+  const skin = m.skins[si] || m.skins[0];
+
+  ldEl.classList.add('on');
+  ldEl.querySelector('span').textContent = m.name + ' 加载中…';
+  errEl.style.display = 'none';
+
+  if(model){
+    app.stage.removeChild(model);
+    model.destroy();
+    model = null;
+  }
+
+  try{
+    let mdl;
+    try {
+      mdl = await PIXI.live2d.Live2DModel.from(skin.path, { autoInteract: false });
+    } catch(e1) {
+      if(!skin.alt) throw e1;
+      // 主 CDN 失败时切备用地址
+      ldEl.querySelector('span').textContent = '切换备用线路…';
+      mdl = await PIXI.live2d.Live2DModel.from(skin.alt, { autoInteract: false });
+    }
+    model = mdl;
+    app.stage.addChild(mdl);
+    curM = mi; curS = si;
+
+    fitAndCenter();
+    document.getElementById('nameTAG').textContent = m.name + (m.skins.length>1 ? ' · ' + skin.label : '');
+
+    // 自动眨眼/呼吸由库接管；额外给个入场淡入
+    mdl.alpha = 0;
+    let a = 0;
+    const fade = setInterval(()=>{ a += 0.08; mdl.alpha = Math.min(1,a); if(a>=1) clearInterval(fade); }, 16);
+
+    // 高亮卡片
+    document.querySelectorAll('.card').forEach(c=>c.classList.remove('on'));
+    [...document.querySelectorAll('.card')].forEach(c=>{
+      if(c.dataset.mid === String(mi)) c.classList.add('on');
+    });
+
+    ldEl.classList.remove('on');
+  } catch(e){
+    console.error('[Live2D]', e);
+    ldEl.classList.remove('on');
+    errEl.style.display = 'block';
+    errEl.innerHTML = `「${m.name}」加载失败<br><span style="color:#8899ad;font-size:11px">该立绘可能缺失资源，可换其他角色试试</span>`;
+  }
+}
+
+function fitAndCenter(){
+  if(!model) return;
+  const im = model.internalModel;
+  const W = app.screen.width, H = app.screen.height;
+  // 以高度为基准适配，保留一点边距
+  const base = im.originalWidth && im.originalHeight
+    ? Math.min(W / im.originalWidth, H / im.originalHeight) * 1.9
+    : 1.6;
+  model.scale.set(base);
+  model.anchor.set(0.5, 0.5);
+  model.x = W / 2;
+  model.y = H * 0.5;
+}
+
+function randomMotion(){
+  if(!model) return;
+  model.internalModel.motionManager.startRandomMotion();
+}
+function randomExpr(){
+  if(!model) return;
+  const em = model.internalModel.motionManager.expressionManager;
+  if(em && em.definitions.length){
+    const i = Math.floor(Math.random()*em.definitions.length);
+    em.setExpression(i);
+  } else {
+    randomMotion();
+  }
+}
+function resetView(){
+  if(!model) return;
+  fitAndCenter();
+}
+function toggleSkin(){
+  const m = MODELS[curM];
+  if(!m || m.skins.length < 2){
+    if(model){ model.motion('Idle'); }
+    return;
+  }
+  load(curM, (curS+1) % m.skins.length);
+}
+
+/* 拖拽 + 点击 */
+stage.addEventListener('pointerdown', e=>{
+  if(!model) return;
+  dragging = { x:e.clientX, y:e.clientY, mx:model.x, my:model.y, moved:false };
+  stage.setPointerCapture(e.pointerId);
+});
+stage.addEventListener('pointermove', e=>{
+  if(!dragging || !model) return;
+  const dx = e.clientX - dragging.x, dy = e.clientY - dragging.y;
+  if(Math.abs(dx)>6 || Math.abs(dy)>6) dragging.moved = true;
+  model.x = dragging.mx + dx;
+  model.y = dragging.my + dy;
+});
+stage.addEventListener('pointerup', e=>{
+  if(dragging && !dragging.moved) randomMotion();
+  dragging = null;
+});
+
+let rz;
+window.addEventListener('resize', ()=>{
+  clearTimeout(rz);
+  rz = setTimeout(()=>{ if(app) app.resize(); fitAndCenter(); }, 150);
+});
+</script>
+</body>
+</html>
