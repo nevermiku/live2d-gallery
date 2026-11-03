@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<title>心动立绘 · 伪 Live2D</title>
+<style>
+:root{--acc:#6ff2d0;--acc2:#4aa8ff;--tx:#eef6f3;--sub:#8fa3b8}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden}
+body{font:14px/1.6 system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:#070b14;color:var(--tx);display:flex;flex-direction:column}
+#stage{flex:1;position:relative;overflow:hidden;touch-action:none;user-select:none}
+/* 背景层：每个角色不同渐变 */
+.bg{position:absolute;inset:-6%;transition:opacity .8s, background .8s;opacity:0;will-change:transform}
+.bg.on{opacity:1}
+#bgA{background:radial-gradient(ellipse at 50% 18%,#1d3a5f 0%,#0d1b33 55%,#070b14 100%)}
+#bgB{background:radial-gradient(ellipse at 50% 15%,#3a1d4f 0%,#191033 55%,#070b14 100%)}
+#bgC{background:radial-gradient(ellipse at 50% 20%,#3a2430 0%,#150f16 60%,#070b14 100%)}
+/* 立绘 */
+.chara{position:absolute;left:50%;bottom:-4%;transform:translateX(-50%);transform-origin:50% 100%;opacity:0;transition:opacity .6s;pointer-events:none;will-change:transform,filter}
+.chara.on{opacity:1}
+.chara img{display:block;height:var(--hh,86vh);max-width:none;filter:drop-shadow(0 18px 30px rgba(0,0,0,.55))}
+.chara.scene img{height:110vh;filter:brightness(.92) saturate(1.05)}
+/* 地面影子 */
+.shadow{position:absolute;left:50%;bottom:calc(-4% + 8px);transform:translateX(-50%);width:34vw;max-width:300px;height:26px;border-radius:50%;background:radial-gradient(ellipse,rgba(0,0,0,.55),transparent 70%);opacity:0;transition:opacity .6s;pointer-events:none}
+.shadow.on{opacity:1}
+.shadow.scene{display:none}
+/* 粒子爱心 */
+.heart{position:absolute;font-size:18px;pointer-events:none;animation:fly 1.6s ease-out forwards;filter:drop-shadow(0 0 6px rgba(255,120,170,.8))}
+@keyframes fly{0%{transform:translate(-50%,0) scale(.4);opacity:1}100%{transform:translate(-50%,-120px) scale(1.25) rotate(var(--rot,15deg));opacity:0}}
+/* 顶部信息 */
+.nameTAG{position:absolute;left:16px;top:14px;font-size:15px;letter-spacing:3px;color:var(--acc);text-shadow:0 0 14px rgba(111,242,208,.5);pointer-events:none;font-weight:800}
+.srcTAG{position:absolute;left:16px;top:36px;font-size:10px;letter-spacing:2px;color:var(--sub);pointer-events:none}
+.hint{position:absolute;right:14px;top:14px;font-size:10px;color:#5d7288;letter-spacing:1px;pointer-events:none;text-align:right;line-height:1.9}
+.ld{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(7,11,20,.6);z-index:9;font-size:12px;letter-spacing:3px;color:var(--acc);transition:opacity .4s}
+.ld.off{opacity:0;pointer-events:none}
+/* 底部面板 */
+.panel{flex:none;background:rgba(13,20,36,.96);border-top:1px solid rgba(40,55,85,.9);padding:8px 0 calc(8px + env(safe-area-inset-bottom))}
+.tabs{display:flex;gap:7px;padding:0 12px 8px;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:none;padding:7px 15px;border-radius:18px;font-size:12.5px;color:var(--sub);border:1px solid rgba(40,55,85,.9);background:#0c1526;cursor:pointer;white-space:nowrap;transition:.15s}
+.tab.on{background:linear-gradient(135deg,rgba(111,242,208,.16),rgba(74,168,255,.14));border-color:var(--acc);color:var(--acc);font-weight:800}
+.acts{display:flex;gap:8px;padding:0 12px}
+.btn{flex:1;padding:10px 4px;border:1px solid rgba(40,55,85,.9);border-radius:10px;background:#0c1526;color:var(--tx);font-size:12.5px;cursor:pointer}
+.btn:active{transform:scale(.97)}
+.btn.hl{background:linear-gradient(135deg,var(--acc),var(--acc2));color:#04121c;font-weight:900;border:0}
+.note{font-size:9px;color:#43536a;text-align:center;padding:6px 12px 0;letter-spacing:.5px}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="bg" id="bgA"></div>
+  <div class="bg" id="bgB"></div>
+  <div class="bg" id="bgC"></div>
+  <div class="shadow" id="shadow"></div>
+  <div class="chara" id="chara"><img id="img" alt=""/></div>
+  <div class="nameTAG" id="nameTAG"></div>
+  <div class="srcTAG" id="srcTAG"></div>
+  <div class="hint">点她有反应 · 拖动视差<br>底部可换角色换装</div>
+  <div class="ld" id="ld">加载立绘中…</div>
+</div>
+<div class="panel">
+  <div class="tabs" id="tabs"></div>
+  <div class="acts">
+    <button class="btn" onclick="poke()">👋 打招呼</button>
+    <button class="btn" onclick="blush()">😳 害羞</button>
+    <button class="btn hl" onclick="switchSkin()">👗 换装</button>
+  </div>
+  <div class="note">立绘素材来自网络收集 · 仅供学习交流 · 禁止商用</div>
+</div>
+
+<script>
+/* ============ 角色配置 ============ */
+const CHARS=[
+  {name:'中野三玖',src:'五等分的新娘',bg:'bgA',
+   skins:[
+     {label:'制服',img:'img/miku1.png',h:'86vh',cutout:true},   // 抠图立绘：站地上
+     {label:'婚纱',img:'img/miku2.jpg',h:'104vh',cutout:false}  // 场景图：呼吸运镜
+   ]},
+  {name:'樱岛麻衣',src:'青春猪头少年',bg:'bgB',
+   skins:[
+     {label:'校服',img:'img/mai1.png',h:'86vh',cutout:true},
+     {label:'兔女郎',img:'img/mai2.jpg',h:'104vh',cutout:false}
+   ]},
+  {name:'心理学家',src:'第五人格',bg:'bgC',
+   skins:[{label:'default',img:'img/ada.jpg',h:'104vh',cutout:false}]}
+];
+
+const stage=document.getElementById('stage'),
+      charaEl=document.getElementById('chara'),
+      imgEl=document.getElementById('img'),
+      shadowEl=document.getElementById('shadow'),
+      nameTAG=document.getElementById('nameTAG'),
+      srcTAG=document.getElementById('srcTAG'),
+      ldEl=document.getElementById('ld');
+
+let ci=0,si=0,px=0,py=0,tx=0,ty=0;
+
+/* ============ 构建 tabs ============ */
+const tabsEl=document.getElementById('tabs');
+CHARS.forEach((c,i)=>{
+  const b=document.createElement('div');
+  b.className='tab'+(i===0?' on':'');
+  b.textContent=c.name+(c.skins.length>1?' ·'+c.skins.length:'');
+  b.onclick=()=>select(i,0);
+  tabsEl.appendChild(b);
+});
+
+function select(i,s){
+  ci=i;si=s;
+  const c=CHARS[i];
+  document.querySelectorAll('.tab').forEach((t,k)=>t.classList.toggle('on',k===i));
+  document.querySelectorAll('.bg').forEach(b=>b.classList.remove('on'));
+  document.getElementById(c.bg).classList.add('on');
+  nameTAG.textContent=c.name;
+  srcTAG.textContent='「 '+c.src+' 」';
+  const sk=c.skins[s];
+  ldEl.classList.remove('off');
+  const pre=new Image();
+  pre.onload=()=>{
+    imgEl.src=sk.img;
+    imgEl.style.setProperty('--hh',sk.h);
+    charaEl.classList.toggle('scene',!sk.cutout);
+    shadowEl.classList.toggle('on',!!sk.cutout);
+    shadowEl.classList.toggle('scene',!sk.cutout);
+    charaEl.classList.remove('on');
+    requestAnimationFrame(()=>charaEl.classList.add('on'));
+    ldEl.classList.add('off');
+  };
+  pre.onerror=()=>{ ldEl.textContent='立绘加载失败，请检查网络'; setTimeout(()=>ldEl.classList.add('off'),2000); };
+  pre.src=sk.img;
+}
+
+function switchSkin(){
+  const c=CHARS[ci];
+  if(c.skins.length>1) select(ci,(si+1)%c.skins.length);
+  else { poke(); }
+}
+
+/* ============ 动效循环：呼吸 + 摇摆 + 视差 ============ */
+let t=0;
+function loop(){
+  t+=1/60;
+  const br=1+Math.sin(t*1.9)*0.008;                 // 呼吸
+  const sway=Math.sin(t*0.9)*0.9;                    // 左右轻摆(角度)
+  const bob=Math.sin(t*1.9)*0.4;                     // 上下浮动
+  const lerp=0.06;
+  px+=(tx-px)*lerp; py+=(ty-py)*lerp;                // 平滑跟随
+  const tilt=(px*-1.2)+sway;                         // 鼠标反向倾斜
+  if(pulseT>0){ pulseT*=0.9; if(pulseT<0.01)pulseT=0; }
+  const ps=1+pulseT*0.045;                           // 点击弹跳
+  const base=CHARS[ci].skins[si].cutout;
+  if(base){
+    charaEl.style.transform=`translateX(calc(-50% + ${px*14}px)) translateY(${py*-6+bob}px) rotate(${tilt*0.5}deg) scale(${br*ps})`;
+  }else{
+    // 场景图：轻微运镜（放大+漂移）
+    charaEl.style.transform=`translateX(calc(-50% + ${px*22}px)) translateY(${py*12+bob*0.6}px) scale(${1.03*ps})`;
+  }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+/* 指针跟随 */
+stage.addEventListener('pointermove',e=>{
+  const r=stage.getBoundingClientRect();
+  tx=(e.clientX-r.left)/r.width*2-1;   // -1..1
+  ty=(e.clientY-r.top)/r.height*2-1;
+});
+stage.addEventListener('pointerleave',()=>{tx=0;ty=0;});
+
+/* 点击 → 爱心 + 摇一下 */
+stage.addEventListener('pointerdown',e=>{
+  if(e.target.closest('.panel'))return;
+  spawnHeart(e.clientX,e.clientY);
+  pulse();
+});
+
+function spawnHeart(x,y){
+  const hs=['💗','💕','❤️','💖','✨'];
+  const h=document.createElement('div');
+  h.className='heart';
+  h.textContent=hs[Math.floor(Math.random()*hs.length)];
+  h.style.left=x+'px'; h.style.top=y+'px';
+  h.style.setProperty('--rot',(Math.random()*40-20)+'deg');
+  stage.appendChild(h);
+  setTimeout(()=>h.remove(),1700);
+}
+
+/* 被点时的反应动作 */
+let pulseT=0;
+function pulse(){ pulseT=1; }
+function poke(){
+  pulseT=2;
+  const r=stage.getBoundingClientRect();
+  for(let i=0;i<5;i++){
+    setTimeout(()=>spawnHeart(r.width*(0.3+Math.random()*0.4),r.height*(0.35+Math.random()*0.25)),i*120);
+  }
+}
+function blush(){
+  const img=imgEl;
+  img.style.filter='drop-shadow(0 18px 30px rgba(0,0,0,.55)) sepia(.25) saturate(1.35) hue-rotate(-18deg)';
+  setTimeout(()=>{img.style.filter='drop-shadow(0 18px 30px rgba(0,0,0,.55))';},1500);
+  const r=stage.getBoundingClientRect();
+  for(let i=0;i<3;i++)setTimeout(()=>spawnHeart(r.width/2,r.height*0.25),i*200);
+}
+
+/* 预加载全部图片 */
+CHARS.forEach(c=>c.skins.forEach(s=>{const i=new Image();i.src=s.img;}));
+select(0,0);
+</script>
+</body>
+</html>
